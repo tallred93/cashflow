@@ -938,12 +938,18 @@ function addRecurring() {
   });
 
   saveJSON('cf_recurring', recurring);
+
+  // Immediately generate an expense for this recurring item
+  addGeneratedExpense(recurring[recurring.length - 1]);
+  saveJSON('cf_expenses', expenses);
+  renderDashboard();
+
   document.getElementById('recName').value = '';
   document.getElementById('recAmount').value = '';
   document.getElementById('recCategory').value = 'food';
   document.getElementById('recFreq').value = 'monthly';
   renderRecurringList();
-  showSnack('Recurring added!');
+  showSnack('Recurring added & expense logged!');
 }
 
 function deleteRecurring(id) {
@@ -955,16 +961,37 @@ function deleteRecurring(id) {
 
 function generateRecurringExpenses() {
   const currentMonth = getCurrentMonthKey();
-  if (recurringLog[currentMonth]) return;
+  if (!recurringLog[currentMonth]) recurringLog[currentMonth] = {};
+  let added = false;
 
   recurring.forEach(r => {
+    if (recurringLog[currentMonth][r.id]) return; // already generated
+
     if (r.frequency === 'monthly') {
       addGeneratedExpense(r);
+      recurringLog[currentMonth][r.id] = true;
+      added = true;
+    } else if (r.frequency === 'weekly') {
+      // Generate ~4 weekly entries for the month
+      for (let w = 0; w < 4; w++) {
+        addGeneratedExpense(r);
+      }
+      recurringLog[currentMonth][r.id] = true;
+      added = true;
+    } else if (r.frequency === 'biweekly') {
+      // Generate 2 biweekly entries for the month
+      for (let w = 0; w < 2; w++) {
+        addGeneratedExpense(r);
+      }
+      recurringLog[currentMonth][r.id] = true;
+      added = true;
     }
   });
 
-  recurringLog[currentMonth] = true;
-  saveJSON('cf_recurring_log', recurringLog);
+  if (added) {
+    saveJSON('cf_expenses', expenses);
+    saveJSON('cf_recurring_log', recurringLog);
+  }
 }
 
 function addGeneratedExpense(rec) {
