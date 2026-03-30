@@ -114,6 +114,18 @@
   .cat-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(56, 189, 248, 0.08); }
   .cat-btn .cat-icon { font-size: 26px; }
 
+  /* ── Income/Expense Toggle ── */
+  .type-toggle {
+    display: flex; gap: 8px; margin-bottom: 20px;
+  }
+  .type-btn {
+    flex: 1; padding: 12px; border-radius: 12px; border: 2px solid var(--surface2);
+    background: var(--surface); color: var(--text-dim); font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .type-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(56, 189, 248, 0.08); }
+  .type-btn.active.income { border-color: var(--green); color: var(--green); background: rgba(52, 211, 153, 0.08); }
+
   /* ── Amount Input ── */
   .amount-display {
     text-align: center; padding: 24px 0 20px;
@@ -135,6 +147,8 @@
   .num-btn:active { background: var(--surface2); }
   .num-btn.action { background: var(--accent); color: var(--bg); font-size: 16px; font-weight: 700; }
   .num-btn.action:active { background: var(--accent-dim); }
+  .num-btn.action.income { background: var(--green); }
+  .num-btn.action.income:active { background: #047857; }
   .num-btn.del { font-size: 18px; }
 
   /* ── Note Input ── */
@@ -164,8 +178,11 @@
   .history-item {
     display: flex; align-items: center; gap: 12px;
     padding: 14px 0; border-bottom: 1px solid var(--surface2);
+    cursor: pointer; transition: opacity 0.2s;
   }
+  .history-item:hover { opacity: 0.7; }
   .history-item:last-child { border-bottom: none; }
+  .history-item.income { color: var(--green); }
   .history-icon { font-size: 22px; width: 36px; text-align: center; }
   .history-info { flex: 1; }
   .history-cat { font-size: 14px; font-weight: 600; }
@@ -225,6 +242,50 @@
   }
   .export-btn:active { background: var(--surface2); }
 
+  /* ── Recurring Section ── */
+  .recurring-section { display: none; }
+  .recurring-section.show { display: block; }
+  .recurring-list {
+    margin-top: 12px;
+  }
+  .recurring-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; background: var(--surface2); border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .recurring-item-info { flex: 1; }
+  .recurring-item-name { font-size: 14px; font-weight: 600; }
+  .recurring-item-freq { font-size: 12px; color: var(--text-dim); }
+  .recurring-item-amount { font-size: 14px; font-weight: 700; color: var(--green); }
+  .recurring-item-del {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 16px; cursor: pointer; padding: 4px 8px;
+  }
+  .recurring-form {
+    background: var(--surface2); border-radius: 12px; padding: 12px;
+    margin-top: 12px;
+  }
+  .recurring-form input, .recurring-form select {
+    width: 100%; padding: 10px; margin-bottom: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 14px; font-family: inherit;
+  }
+  .recurring-form select { cursor: pointer; }
+  .recurring-form button {
+    width: 100%; padding: 10px; background: var(--green);
+    color: var(--bg); border: none; border-radius: 8px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+
+  /* ── Sync Status ── */
+  .sync-status {
+    font-size: 12px; color: var(--text-dim); margin-top: 6px;
+    text-align: center;
+  }
+  .sync-status.synced { color: var(--green); }
+  .sync-status.syncing { color: var(--yellow); }
+  .sync-status.error { color: var(--red); }
+
   /* ── Snackbar ── */
   .snackbar {
     position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
@@ -269,7 +330,7 @@
 
   <div class="row">
     <div class="card">
-      <div class="card-label">Spent</div>
+      <div class="card-label">Net Spent</div>
       <div class="card-value" id="totalSpent">$0</div>
     </div>
     <div class="card">
@@ -296,9 +357,14 @@
   </div>
 </div>
 
-<!-- ══════════════ ADD EXPENSE ══════════════ -->
+<!-- ══════════════ ADD EXPENSE/INCOME ══════════════ -->
 <div id="screen-add" class="screen">
-  <div class="screen-title">Add Expense</div>
+  <div class="screen-title" id="addScreenTitle">Add Expense</div>
+
+  <div class="type-toggle">
+    <button class="type-btn active" onclick="switchType('expense')" id="expenseTypeBtn">💰 Expense</button>
+    <button class="type-btn" onclick="switchType('income')" id="incomeTypeBtn">💸 Income</button>
+  </div>
 
   <div class="cat-grid" id="catGrid"></div>
 
@@ -324,7 +390,7 @@
   </div>
 
   <div style="max-width:340px;margin:12px auto 0">
-    <button class="num-btn action" style="width:100%;height:52px" onclick="saveExpense()">Save Expense</button>
+    <button class="num-btn action" style="width:100%;height:52px" id="saveBtn" onclick="saveExpense()">Save Expense</button>
   </div>
 </div>
 
@@ -363,7 +429,40 @@
 
   <button class="num-btn action" style="width:100%;height:52px;margin-top:8px" onclick="saveSettings()">Save Settings</button>
 
-  <button class="export-btn" onclick="exportData()" style="margin-top:24px">Export All Data (JSON)</button>
+  <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--surface2)">
+    <div class="setting-label">Recurring Expenses</div>
+    <button class="export-btn" onclick="toggleRecurringSection()">Manage Recurring</button>
+
+    <div class="recurring-section" id="recurringSection">
+      <div class="recurring-list" id="recurringList"></div>
+
+      <div class="recurring-form">
+        <input type="text" id="recName" placeholder="Name (e.g., Netflix)" maxlength="30">
+        <input type="number" id="recAmount" placeholder="Amount" inputmode="decimal">
+        <select id="recCategory">
+          <option value="food">Food</option>
+          <option value="transport">Transport</option>
+          <option value="bills">Bills</option>
+          <option value="entertain">Fun</option>
+          <option value="shopping">Shopping</option>
+          <option value="health">Health</option>
+          <option value="home">Home</option>
+          <option value="other">Other</option>
+        </select>
+        <select id="recFreq">
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+        <button onclick="addRecurring()">Add Recurring</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="export-btn" onclick="syncToSheets()" style="margin-top:24px" id="syncBtn">Sync to Google Sheets</button>
+  <div class="sync-status" id="syncStatus"></div>
+
+  <button class="export-btn" onclick="exportData()" style="margin-top:12px">Export All Data (JSON)</button>
   <button class="export-btn" onclick="importData()">Import Data (JSON)</button>
   <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
 
@@ -417,19 +516,34 @@ const CATEGORIES = [
   { id: 'other', name: 'Other', icon: '📌' },
 ];
 
+const INCOME_CATEGORIES = [
+  { id: 'payback', name: 'Payback', icon: '💸' },
+  { id: 'freelance', name: 'Freelance', icon: '💻' },
+  { id: 'gift', name: 'Gift', icon: '🎁' },
+  { id: 'refund', name: 'Refund', icon: '↩️' },
+  { id: 'other', name: 'Other', icon: '📌' },
+];
+
 const CAT_COLORS = {
   food: '#f87171', transport: '#38bdf8', bills: '#a78bfa',
   entertain: '#fbbf24', shopping: '#fb923c', health: '#34d399',
   home: '#f472b6', other: '#94a3b8'
 };
 
+const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzYxtx9HXA6AwaP-7nM4e17TsCtlW_LJuZ_NZKVBjiiWNyqAOdn_ufA9InviLfN2FGwYQ/exec';
+
 // ── State ──
 let settings = loadJSON('cf_settings', { income: 0, invest: 0, target: 20 });
 let expenses = loadJSON('cf_expenses', []);
+let recurring = loadJSON('cf_recurring', []);
+let recurringLog = loadJSON('cf_recurring_log', {});
+
 let selectedCat = 'food';
 let amountStr = '0';
 let viewMonth = getCurrentMonthKey();
 let histMonth = getCurrentMonthKey();
+let currentType = 'expense';
+let editingExpenseId = null;
 
 // ── Helpers ──
 function loadJSON(key, fallback) {
@@ -453,7 +567,8 @@ function fmtShort(n) {
   if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'k';
   return '$' + Math.round(n);
 }
-function getMonthExpenses(key) { return expenses.filter(e => e.date.startsWith(key)); }
+function getMonthExpenses(key) { return expenses.filter(e => e.date.startsWith(key) && (e.type || 'expense') === 'expense'); }
+function getMonthIncome(key) { return expenses.filter(e => e.date.startsWith(key) && e.type === 'income'); }
 
 function showSnack(msg) {
   const el = document.getElementById('snackbar');
@@ -476,19 +591,21 @@ function switchScreen(name) {
 // ── Dashboard ──
 function renderDashboard() {
   const monthExp = getMonthExpenses(viewMonth);
-  const totalSpent = monthExp.reduce((s,e) => s + e.amount, 0);
+  const monthInc = getMonthIncome(viewMonth);
+  const totalExpenses = monthExp.reduce((s,e) => s + e.amount, 0);
+  const totalIncome = monthInc.reduce((s,e) => s + e.amount, 0);
+  const netSpent = totalExpenses - totalIncome;
   const spendBudget = settings.income - settings.invest;
-  const remaining = spendBudget - totalSpent;
+  const remaining = spendBudget - netSpent;
   const savingsTarget = settings.income * (settings.target / 100);
-  const actualSavings = settings.income - settings.invest - totalSpent;
+  const actualSavings = settings.income - settings.invest - netSpent;
   const isCurrentMonth = viewMonth === getCurrentMonthKey();
 
   document.getElementById('dashMonthLabel').textContent = formatMonthLabel(viewMonth);
-  document.getElementById('totalSpent').textContent = fmt(totalSpent);
+  document.getElementById('totalSpent').textContent = fmt(netSpent);
   document.getElementById('totalRemaining').textContent = fmt(Math.max(0, remaining));
   document.getElementById('totalRemaining').style.color = remaining >= 0 ? 'var(--green)' : 'var(--red)';
 
-  // Savings status
   const statusEl = document.getElementById('savingsStatus');
   const {year, month} = parseMonthKey(viewMonth);
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -504,8 +621,8 @@ function renderDashboard() {
     document.getElementById('savingsSubtext').textContent = '';
   } else {
     const expectedSpendNow = spendBudget * pctThrough;
-    const onTrack = totalSpent <= expectedSpendNow * 1.05;
-    const close = totalSpent <= expectedSpendNow * 1.15;
+    const onTrack = netSpent <= expectedSpendNow * 1.05;
+    const close = netSpent <= expectedSpendNow * 1.15;
 
     if (onTrack) {
       statusEl.innerHTML = '<span class="status-badge on-track">On Track</span>';
@@ -527,7 +644,6 @@ function renderDashboard() {
       : `Final: saved ${savingsPct.toFixed(1)}% of income`;
   }
 
-  // Category breakdown
   const container = document.getElementById('categoryBreakdown');
   const catTotals = {};
   monthExp.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
@@ -554,10 +670,30 @@ function renderDashboard() {
 function changeMonth(dir) { viewMonth = monthKeyOffset(viewMonth, dir); renderDashboard(); }
 function changeHistMonth(dir) { histMonth = monthKeyOffset(histMonth, dir); renderHistory(); }
 
-// ── Add Expense ──
+// ── Add Expense/Income ──
+function switchType(type) {
+  currentType = type;
+  const isExpense = type === 'expense';
+  document.getElementById('expenseTypeBtn').classList.toggle('active', isExpense);
+  document.getElementById('incomeTypeBtn').classList.toggle('active', !isExpense);
+
+  const saveBtn = document.getElementById('saveBtn');
+  if (isExpense) {
+    saveBtn.classList.remove('income');
+    saveBtn.textContent = editingExpenseId ? 'Update Expense' : 'Save Expense';
+  } else {
+    saveBtn.classList.add('income');
+    saveBtn.textContent = editingExpenseId ? 'Update Income' : 'Save Income';
+  }
+
+  document.getElementById('addScreenTitle').textContent = isExpense ? 'Add Expense' : 'Add Income';
+  buildCatGrid();
+}
+
 function buildCatGrid() {
+  const cats = currentType === 'expense' ? CATEGORIES : INCOME_CATEGORIES;
   const grid = document.getElementById('catGrid');
-  grid.innerHTML = CATEGORIES.map(c => `
+  grid.innerHTML = cats.map(c => `
     <button class="cat-btn ${c.id === selectedCat ? 'selected' : ''}" onclick="selectCat('${c.id}')">
       <span class="cat-icon">${c.icon}</span>${c.name}
     </button>
@@ -566,9 +702,6 @@ function buildCatGrid() {
 
 function selectCat(id) {
   selectedCat = id;
-  document.querySelectorAll('.cat-btn').forEach(b => {
-    b.classList.toggle('selected', b.textContent.trim().startsWith(CATEGORIES.find(c=>c.id===id).icon));
-  });
   buildCatGrid();
 }
 
@@ -593,35 +726,66 @@ function resetAddScreen() {
   amountStr = '0';
   document.getElementById('amountValue').textContent = '0';
   document.getElementById('noteInput').value = '';
+  editingExpenseId = null;
+  currentType = 'expense';
   selectedCat = 'food';
-  buildCatGrid();
+  switchType('expense');
+}
+
+function editExpense(id) {
+  const exp = expenses.find(e => e.id === id);
+  if (!exp) return;
+
+  editingExpenseId = id;
+  currentType = exp.type || 'expense';
+  selectedCat = exp.category;
+  amountStr = String(exp.amount);
+  document.getElementById('noteInput').value = exp.note || '';
+
+  switchType(currentType);
+  document.getElementById('amountValue').textContent = amountStr;
+
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.textContent = currentType === 'expense' ? 'Update Expense' : 'Update Income';
+
+  switchScreen('add');
 }
 
 function saveExpense() {
   const amount = parseFloat(amountStr);
   if (!amount || amount <= 0) { showSnack('Enter an amount'); return; }
 
-  expenses.push({
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+  const expenseData = {
     amount,
     category: selectedCat,
     note: document.getElementById('noteInput').value.trim(),
     date: new Date().toISOString().split('T')[0],
-    time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  });
+    time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    type: currentType
+  };
+
+  if (editingExpenseId) {
+    const idx = expenses.findIndex(e => e.id === editingExpenseId);
+    if (idx >= 0) {
+      expenses[idx] = { ...expenses[idx], ...expenseData };
+    }
+  } else {
+    expenseData.id = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    expenses.push(expenseData);
+  }
 
   saveJSON('cf_expenses', expenses);
-  showSnack(`${fmt(amount)} saved!`);
+  showSnack(editingExpenseId ? `${fmt(amount)} updated!` : `${fmt(amount)} saved!`);
   resetAddScreen();
+  syncExpenses();
 
-  // Quick haptic if available
   if (navigator.vibrate) navigator.vibrate(10);
 }
 
 // ── History ──
 function renderHistory() {
   document.getElementById('histMonthLabel').textContent = formatMonthLabel(histMonth);
-  const monthExp = getMonthExpenses(histMonth).sort((a,b) => b.id.localeCompare(a.id));
+  const monthExp = expenses.filter(e => e.date.startsWith(histMonth)).sort((a,b) => b.id.localeCompare(a.id));
   const container = document.getElementById('historyList');
 
   if (monthExp.length === 0) {
@@ -629,7 +793,6 @@ function renderHistory() {
     return;
   }
 
-  // Group by date
   const groups = {};
   monthExp.forEach(e => {
     if (!groups[e.date]) groups[e.date] = [];
@@ -640,7 +803,10 @@ function renderHistory() {
   for (const [date, items] of Object.entries(groups)) {
     const d = new Date(date + 'T12:00:00');
     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const dayTotal = items.reduce((s,e) => s + e.amount, 0);
+    const dayTotal = items.reduce((s,e) => {
+      const type = e.type || 'expense';
+      return type === 'income' ? s - e.amount : s + e.amount;
+    }, 0);
 
     html += `<div class="card">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -649,19 +815,23 @@ function renderHistory() {
       </div>`;
 
     items.forEach(e => {
-      const cat = CATEGORIES.find(c => c.id === e.category) || CATEGORIES[7];
+      const type = e.type || 'expense';
+      const cats = type === 'income' ? INCOME_CATEGORIES : CATEGORIES;
+      const cat = cats.find(c => c.id === e.category) || cats[cats.length - 1];
+      const isIncome = type === 'income';
+
       html += `
-        <div class="history-item">
+        <div class="history-item ${isIncome ? 'income' : ''}" onclick="editExpense('${e.id}')">
           <div class="history-icon">${cat.icon}</div>
           <div class="history-info">
             <div class="history-cat">${cat.name}</div>
             ${e.note ? `<div class="history-note">${e.note}</div>` : ''}
           </div>
           <div class="history-right">
-            <div class="history-amount">${fmt(e.amount)}</div>
+            <div class="history-amount">${isIncome ? '+' : ''}${fmt(e.amount)}</div>
             ${e.time ? `<div class="history-date">${e.time}</div>` : ''}
           </div>
-          <button class="history-delete" onclick="confirmDeleteExpense('${e.id}')">&#x2715;</button>
+          <button class="history-delete" onclick="event.stopPropagation();confirmDeleteExpense('${e.id}')">&#x2715;</button>
         </div>`;
     });
 
@@ -675,7 +845,7 @@ function renderHistory() {
 let pendingDeleteId = null;
 function confirmDeleteExpense(id) {
   pendingDeleteId = id;
-  document.getElementById('dialogMsg').textContent = 'Delete this expense?';
+  document.getElementById('dialogMsg').textContent = 'Delete this item?';
   document.getElementById('dialogConfirm').textContent = 'Delete';
   document.getElementById('dialogConfirm').onclick = () => {
     expenses = expenses.filter(e => e.id !== pendingDeleteId);
@@ -683,6 +853,7 @@ function confirmDeleteExpense(id) {
     closeDialog();
     renderHistory();
     showSnack('Deleted');
+    syncExpenses();
   };
   document.getElementById('dialog').classList.add('show');
 }
@@ -693,8 +864,12 @@ function confirmClearData() {
   document.getElementById('dialogConfirm').onclick = () => {
     localStorage.removeItem('cf_expenses');
     localStorage.removeItem('cf_settings');
+    localStorage.removeItem('cf_recurring');
+    localStorage.removeItem('cf_recurring_log');
     expenses = [];
     settings = { income: 0, invest: 0, target: 20 };
+    recurring = [];
+    recurringLog = {};
     closeDialog();
     switchScreen('dashboard');
     showSnack('All data cleared');
@@ -709,6 +884,7 @@ function populateSettings() {
   document.getElementById('inputIncome').value = settings.income || '';
   document.getElementById('inputInvest').value = settings.invest || '';
   document.getElementById('inputTarget').value = settings.target || 20;
+  renderRecurringList();
 }
 
 function saveSettings() {
@@ -717,11 +893,168 @@ function saveSettings() {
   settings.target = parseFloat(document.getElementById('inputTarget').value) || 20;
   saveJSON('cf_settings', settings);
   showSnack('Settings saved!');
+  syncSettings();
+}
+
+// ── Recurring Expenses ──
+function toggleRecurringSection() {
+  const section = document.getElementById('recurringSection');
+  section.classList.toggle('show');
+}
+
+function renderRecurringList() {
+  const list = document.getElementById('recurringList');
+  if (recurring.length === 0) {
+    list.innerHTML = '<p style="text-align:center;color:var(--text-dim);padding:12px">No recurring expenses yet</p>';
+    return;
+  }
+
+  list.innerHTML = recurring.map(r => `
+    <div class="recurring-item">
+      <div class="recurring-item-info">
+        <div class="recurring-item-name">${r.name}</div>
+        <div class="recurring-item-freq">${r.frequency} · ${r.category}</div>
+      </div>
+      <div class="recurring-item-amount">${fmt(r.amount)}</div>
+      <button class="recurring-item-del" onclick="deleteRecurring('${r.id}')">&#x2715;</button>
+    </div>
+  `).join('');
+}
+
+function addRecurring() {
+  const name = document.getElementById('recName').value.trim();
+  const amount = parseFloat(document.getElementById('recAmount').value);
+  const category = document.getElementById('recCategory').value;
+  const freq = document.getElementById('recFreq').value;
+
+  if (!name || !amount || amount <= 0) {
+    showSnack('Fill in all fields');
+    return;
+  }
+
+  recurring.push({
+    id: Date.now().toString(36),
+    name, amount, category, frequency: freq
+  });
+
+  saveJSON('cf_recurring', recurring);
+  document.getElementById('recName').value = '';
+  document.getElementById('recAmount').value = '';
+  document.getElementById('recCategory').value = 'food';
+  document.getElementById('recFreq').value = 'monthly';
+  renderRecurringList();
+  showSnack('Recurring added!');
+}
+
+function deleteRecurring(id) {
+  recurring = recurring.filter(r => r.id !== id);
+  saveJSON('cf_recurring', recurring);
+  renderRecurringList();
+  showSnack('Recurring deleted');
+}
+
+function generateRecurringExpenses() {
+  const currentMonth = getCurrentMonthKey();
+  if (recurringLog[currentMonth]) return;
+
+  recurring.forEach(r => {
+    if (r.frequency === 'monthly') {
+      addGeneratedExpense(r);
+    }
+  });
+
+  recurringLog[currentMonth] = true;
+  saveJSON('cf_recurring_log', recurringLog);
+}
+
+function addGeneratedExpense(rec) {
+  const today = new Date().toISOString().split('T')[0];
+  expenses.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    amount: rec.amount,
+    category: rec.category,
+    note: `[Recurring] ${rec.name}`,
+    date: today,
+    time: '12:00 AM',
+    type: 'expense'
+  });
+}
+
+// ── Google Sheets Sync ──
+function syncExpenses() {
+  if (!expenses.length) return;
+  fetch(GOOGLE_SHEETS_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'syncAll',
+      expenses: expenses,
+      timestamp: new Date().toISOString()
+    })
+  }).catch(() => {});
+}
+
+function syncSettings() {
+  fetch(GOOGLE_SHEETS_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'saveSettings',
+      settings: settings,
+      timestamp: new Date().toISOString()
+    })
+  }).catch(() => {});
+}
+
+function syncToSheets() {
+  const btn = document.getElementById('syncBtn');
+  const status = document.getElementById('syncStatus');
+
+  btn.disabled = true;
+  status.textContent = 'Syncing...';
+  status.classList.add('syncing');
+
+  Promise.all([
+    fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'syncAll',
+        expenses: expenses,
+        timestamp: new Date().toISOString()
+      })
+    }),
+    fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'saveSettings',
+        settings: settings,
+        timestamp: new Date().toISOString()
+      })
+    })
+  ]).then(() => {
+    status.textContent = 'Synced!';
+    status.classList.remove('syncing');
+    status.classList.add('synced');
+    showSnack('Data synced to Google Sheets');
+    setTimeout(() => {
+      btn.disabled = false;
+      status.textContent = '';
+      status.classList.remove('synced');
+    }, 2000);
+  }).catch(() => {
+    status.textContent = 'Sync failed';
+    status.classList.remove('syncing');
+    status.classList.add('error');
+    btn.disabled = false;
+  });
 }
 
 // ── Export / Import ──
 function exportData() {
-  const data = JSON.stringify({ settings, expenses, exportDate: new Date().toISOString() }, null, 2);
+  const data = JSON.stringify({
+    settings,
+    expenses,
+    recurring,
+    exportDate: new Date().toISOString()
+  }, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -740,6 +1073,7 @@ function handleImport(event) {
       const data = JSON.parse(e.target.result);
       if (data.settings) { settings = data.settings; saveJSON('cf_settings', settings); }
       if (data.expenses) { expenses = data.expenses; saveJSON('cf_expenses', expenses); }
+      if (data.recurring) { recurring = data.recurring; saveJSON('cf_recurring', recurring); }
       showSnack('Data imported!');
       switchScreen('dashboard');
     } catch { showSnack('Invalid file'); }
@@ -750,6 +1084,7 @@ function handleImport(event) {
 
 // ── Init ──
 buildCatGrid();
+generateRecurringExpenses();
 renderDashboard();
 
 // Register service worker
