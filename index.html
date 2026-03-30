@@ -195,6 +195,24 @@
     font-size: 16px; cursor: pointer; border-radius: 8px;
   }
   .history-delete:active { background: var(--red-dim); color: var(--red); }
+  .history-repeat {
+    background: none; border: none; color: var(--text-dim); padding: 8px;
+    font-size: 16px; cursor: pointer; border-radius: 8px;
+  }
+  .history-repeat:active { background: var(--accent); color: #fff; }
+
+  /* ── Frequent Chips ── */
+  .frequent-section { margin-bottom: 12px; }
+  .frequent-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .frequent-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .frequent-chip {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 6px 14px; font-size: 13px;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+  }
+  .frequent-chip:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .frequent-chip .chip-icon { font-size: 14px; }
+  .frequent-chip .chip-amount { font-weight: 600; color: var(--green); }
 
   /* ── Settings ── */
   .setting-group { margin-bottom: 24px; }
@@ -360,6 +378,8 @@
 <!-- ══════════════ ADD EXPENSE/INCOME ══════════════ -->
 <div id="screen-add" class="screen">
   <div class="screen-title" id="addScreenTitle">Add Expense</div>
+
+  <div id="frequentSection" class="frequent-section"></div>
 
   <div class="type-toggle">
     <button class="type-btn active" onclick="switchType('expense')" id="expenseTypeBtn">💰 Expense</button>
@@ -730,6 +750,7 @@ function resetAddScreen() {
   currentType = 'expense';
   selectedCat = 'food';
   switchType('expense');
+  renderFrequent();
 }
 
 function editExpense(id) {
@@ -749,6 +770,78 @@ function editExpense(id) {
   saveBtn.textContent = currentType === 'expense' ? 'Update Expense' : 'Update Income';
 
   switchScreen('add');
+}
+
+function repeatExpense(id) {
+  const exp = expenses.find(e => e.id === id);
+  if (!exp) return;
+
+  // Pre-fill like edit, but DON'T set editingExpenseId — this creates a new entry
+  editingExpenseId = null;
+  currentType = exp.type || 'expense';
+  selectedCat = exp.category;
+  amountStr = String(exp.amount);
+  document.getElementById('noteInput').value = exp.note || '';
+
+  switchType(currentType);
+  document.getElementById('amountValue').textContent = amountStr;
+
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.textContent = currentType === 'expense' ? 'Save Expense' : 'Save Income';
+
+  switchScreen('add');
+}
+
+function renderFrequent() {
+  const section = document.getElementById('frequentSection');
+  if (!expenses.length) { section.innerHTML = ''; return; }
+
+  // Count expenses by note+category combo (only ones with notes)
+  const counts = {};
+  expenses.forEach(e => {
+    if (!e.note || e.note.startsWith('[Recurring]')) return;
+    const key = `${e.category}|${e.note}`;
+    if (!counts[key]) counts[key] = { note: e.note, category: e.category, type: e.type || 'expense', amount: e.amount, count: 0 };
+    counts[key].count++;
+    counts[key].amount = e.amount; // use most recent amount
+  });
+
+  // Get top 6 most frequent, minimum 2 occurrences
+  const frequent = Object.values(counts)
+    .filter(c => c.count >= 2)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  if (!frequent.length) { section.innerHTML = ''; return; }
+
+  const cats = [...CATEGORIES, ...INCOME_CATEGORIES];
+  section.innerHTML = `
+    <div class="frequent-label">Quick Add</div>
+    <div class="frequent-chips">
+      ${frequent.map(f => {
+        const cat = cats.find(c => c.id === f.category) || { icon: '📦' };
+        return `<div class="frequent-chip" onclick="quickAdd('${f.category}','${f.note.replace(/'/g, "\\'")}','${f.amount}','${f.type}')">
+          <span class="chip-icon">${cat.icon}</span>
+          <span>${f.note}</span>
+          <span class="chip-amount">${fmt(f.amount)}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function quickAdd(category, note, amount, type) {
+  editingExpenseId = null;
+  currentType = type || 'expense';
+  selectedCat = category;
+  amountStr = String(amount);
+  document.getElementById('noteInput').value = note;
+
+  switchType(currentType);
+  document.getElementById('amountValue').textContent = amountStr;
+
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.textContent = currentType === 'expense' ? 'Save Expense' : 'Save Income';
+  showSnack('Tap Save or change the amount');
 }
 
 function saveExpense() {
@@ -831,6 +924,7 @@ function renderHistory() {
             <div class="history-amount">${isIncome ? '+' : ''}${fmt(e.amount)}</div>
             ${e.time ? `<div class="history-date">${e.time}</div>` : ''}
           </div>
+          <button class="history-repeat" onclick="event.stopPropagation();repeatExpense('${e.id}')" title="Repeat">&#x21bb;</button>
           <button class="history-delete" onclick="event.stopPropagation();confirmDeleteExpense('${e.id}')">&#x2715;</button>
         </div>`;
     });
