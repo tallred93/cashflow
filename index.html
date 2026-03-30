@@ -585,7 +585,7 @@ function switchScreen(name) {
   if (name === 'dashboard') renderDashboard();
   if (name === 'history') renderHistory();
   if (name === 'settings') populateSettings();
-  if (name === 'add') resetAddScreen();
+  if (name === 'add' && !editingExpenseId) resetAddScreen();
 }
 
 // ── Dashboard ──
