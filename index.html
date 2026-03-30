@@ -564,6 +564,7 @@ let viewMonth = getCurrentMonthKey();
 let histMonth = getCurrentMonthKey();
 let currentType = 'expense';
 let editingExpenseId = null;
+let skipReset = false;
 
 // ── Helpers ──
 function loadJSON(key, fallback) {
@@ -605,7 +606,8 @@ function switchScreen(name) {
   if (name === 'dashboard') renderDashboard();
   if (name === 'history') renderHistory();
   if (name === 'settings') populateSettings();
-  if (name === 'add' && !editingExpenseId) resetAddScreen();
+  if (name === 'add' && !editingExpenseId && !skipReset) resetAddScreen();
+  skipReset = false;
 }
 
 // ── Dashboard ──
@@ -777,6 +779,7 @@ function repeatExpense(id) {
   if (!exp) return;
 
   // Pre-fill like edit, but DON'T set editingExpenseId — this creates a new entry
+  skipReset = true;
   editingExpenseId = null;
   currentType = exp.type || 'expense';
   selectedCat = exp.category;
@@ -830,6 +833,7 @@ function renderFrequent() {
 }
 
 function quickAdd(category, note, amount, type) {
+  skipReset = true;
   editingExpenseId = null;
   currentType = type || 'expense';
   selectedCat = category;
